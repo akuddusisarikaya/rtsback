@@ -36,6 +36,5 @@ func CreateCollectionIfNotExists(database *mongo.Database, collectionName string
         return database.CreateCollection(ctx, collectionName)
     }
 
-    log.Printf("Koleksiyon zaten var: %s", collectionName)
     return nil
 }
