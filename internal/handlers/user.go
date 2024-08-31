@@ -3,9 +3,9 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
-	"log"
 
 	"rtsback/config"
 	"rtsback/internal/models"
@@ -13,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -119,4 +120,72 @@ func GetUserProfile(w http.ResponseWriter, r *http.Request) {
 	// Kullanıcıyı JSON formatında döndür
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(user)
+}
+
+func GetUsers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var users []models.User
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cursor, err := userCollection.Find(ctx, bson.M{})
+	if err != nil {
+		http.Error(w, "Veri çekme hatası", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	if err = cursor.All(ctx, &users); err != nil {
+		http.Error(w, "Veri çözümleme hatası", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(users)
+}
+
+// handlers/user.go
+
+func UpdateUsers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Gelen veriyi çözümle
+	var users []models.User
+	err := json.NewDecoder(r.Body).Decode(&users)
+	if err != nil {
+		http.Error(w, "Veri çözümleme hatası: Geçersiz veri formatı", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Her kullanıcı için güncelleme işlemi
+	for _, user := range users {
+		// Güncelleme için filtre ve update değerleri oluşturuluyor
+		filter := bson.M{"_id": user.ID}
+		update := bson.M{"$set": bson.M{
+			"name":         user.Name,
+			"email":        user.Email,
+			"passwordHash": user.PasswordHash,
+			"role":         user.Role,
+			"phone":        user.Phone,
+			"company_id":   user.CompanyID,
+			"super_user":   user.SuperUser,
+			"updatedAt":    time.Now(),
+		}}
+
+		// Güncelleme işlemini gerçekleştirme
+		opts := options.Update().SetUpsert(true) // Eğer kayıt yoksa oluşturabilir
+		_, err := userCollection.UpdateOne(ctx, filter, update, opts)
+		if err != nil {
+			log.Printf("Güncelleme hatası: %v", err)
+			http.Error(w, "Veritabanı güncelleme hatası", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Başarılı güncelleme yanıtı
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Kullanıcılar başarıyla güncellendi"})
 }

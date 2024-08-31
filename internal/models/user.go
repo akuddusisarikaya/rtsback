@@ -1,8 +1,9 @@
 package models
 
 import (
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type User struct {
@@ -15,4 +16,5 @@ type User struct {
 	CompanyID    primitive.ObjectID `bson:"company_id,omitempty"`
 	CreatedAt    time.Time          `bson:"created_at,omitempty"`
 	UpdatedAt    time.Time          `bson:"updated_at,omitempty"`
+	SuperUser    bool               `bson:"super_user,omitempty"`
 }

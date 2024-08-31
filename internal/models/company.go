@@ -8,7 +8,7 @@ import (
 
 type Company struct {
 	ID              primitive.ObjectID `bson:"_id,omitempty"`
-	AdminID         primitive.ObjectID `bson:"admin_id,omitempty"`
+	AdminID         string             `bson:"admin_id,omitempty"`
 	AdminName       string             `bson:"admin_name,omitempty"`
 	Name            string             `bson:"name,omitempty"`
 	Address         string             `bson:"address,omitempty"`
