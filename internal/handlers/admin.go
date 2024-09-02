@@ -10,9 +10,11 @@ import (
 
 	"net/http"
 
+	"github.com/dgrijalva/jwt-go"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var adminCollection *mongo.Collection
@@ -20,6 +22,57 @@ var adminCollection *mongo.Collection
 func init() {
 	client := config.ConnectDB()
 	adminCollection = config.GetCollection(client, "admin")
+	userCollection = config.GetCollection(client, "user")
+}
+
+func LoginAdmin(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var creds struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&creds)
+	if err != nil {
+		http.Error(w, "Geçersiz veri formatı", http.StatusBadRequest)
+		return
+	}
+
+	var admin models.Admin
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Admini e-posta ile bulma
+	err = adminCollection.FindOne(ctx, bson.M{"email": creds.Email}).Decode(&admin)
+	if err != nil {
+		http.Error(w, "Kullanıcı bulunamadı", http.StatusUnauthorized)
+		return
+	}
+
+	// Şifre doğrulama
+	err = bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(creds.Password))
+	if err != nil {
+		http.Error(w, "Geçersiz şifre", http.StatusUnauthorized)
+		return
+	}
+
+	// Token oluşturma
+	expirationTime := time.Now().Add(24 * time.Hour)
+	claims := &jwt.StandardClaims{
+		ExpiresAt: expirationTime.Unix(),
+		Subject:   admin.ID.Hex(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte("your_secret_key"))
+	if err != nil {
+		http.Error(w, "Token oluşturulamadı", http.StatusInternalServerError)
+		return
+	}
+
+	// Yanıt
+	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
 }
 
 // Admin verilerini çekme
@@ -45,6 +98,12 @@ func GetAdmins(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(admins)
 }
 
+// Şifreyi hash'leyen fonksiyon
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
+}
+
 func AddAdmin(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -55,13 +114,31 @@ func AddAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	admin.ID = primitive.NewObjectID() // Yeni bir ObjectID oluşturur
-	admin.CreatedAt = time.Now()
-	admin.UpdatedAt = time.Now()
-
+	// Kullanıcıyı email üzerinden eşleştirin
+	var user models.User
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	err = userCollection.FindOne(ctx, bson.M{"email": admin.Email}).Decode(&user)
+	if err != nil {
+		http.Error(w, "Kullanıcı bulunamadı", http.StatusBadRequest)
+		return
+	}
+
+	// Şifreyi hash'leyin
+	hashedPassword, err := hashPassword(admin.Password)
+	if err != nil {
+		http.Error(w, "Şifre hash'lemesi başarısız oldu", http.StatusInternalServerError)
+		return
+	}
+	admin.Password = hashedPassword
+
+	// Adminin ek bilgilerini ayarlayın
+	admin.ID = primitive.NewObjectID()
+	admin.CreatedAt = time.Now()
+	admin.UpdatedAt = time.Now()
+
+	// Admin belgesini veritabanına ekleyin
 	_, err = adminCollection.InsertOne(ctx, admin)
 	if err != nil {
 		http.Error(w, "Veritabanına eklenemedi", http.StatusInternalServerError)

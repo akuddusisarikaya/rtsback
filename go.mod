@@ -3,6 +3,7 @@ module rtsback
 go 1.21.3
 
 require (
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/mux v1.8.1
 	github.com/klauspost/compress v1.13.6 // indirect

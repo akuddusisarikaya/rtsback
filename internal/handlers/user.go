@@ -10,6 +10,7 @@ import (
 	"rtsback/config"
 	"rtsback/internal/models"
 
+	"github.com/dgrijalva/jwt-go"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -59,66 +60,76 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
+var jwtKey = []byte("your_secret_key") // JWT için gizli anahtar
+
 func Login(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	var loginData struct {
+	var creds struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 
-	err := json.NewDecoder(r.Body).Decode(&loginData)
+	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		http.Error(w, "Geçersiz veri formatı", http.StatusBadRequest)
 		return
 	}
 
+	var user models.User
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Kullanıcıyı e-posta ile veritabanından bul
-	var user models.User
-	err = userCollection.FindOne(ctx, bson.M{"email": loginData.Email}).Decode(&user)
+	err = userCollection.FindOne(ctx, bson.M{"email": creds.Email}).Decode(&user)
 	if err != nil {
-		http.Error(w, "Kullanıcı bulunamadı veya veritabanı hatası", http.StatusUnauthorized)
+		http.Error(w, "Kullanıcı bulunamadı", http.StatusUnauthorized)
 		return
 	}
 
-	// Şifreyi doğrula
-	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(loginData.Password))
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(creds.Password))
 	if err != nil {
-		http.Error(w, "Şifre yanlış", http.StatusUnauthorized)
+		http.Error(w, "Geçersiz şifre", http.StatusUnauthorized)
 		return
 	}
 
-	// Giriş başarılı
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Login successful"})
+	expirationTime := time.Now().Add(24 * time.Hour)
+	claims := &jwt.StandardClaims{
+		ExpiresAt: expirationTime.Unix(),
+		Subject:   user.ID.Hex(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		http.Error(w, "Token oluşturulamadı", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:    "token",
+		Value:   tokenString,
+		Expires: expirationTime,
+	})
+
+	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
 }
+
 func GetUserProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Kullanıcının e-posta adresini sorgu parametresinden al
 	email := r.URL.Query().Get("email")
 	if email == "" {
 		http.Error(w, "E-posta belirtilmedi", http.StatusBadRequest)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Kullanıcıyı veritabanında ara
 	var user models.User
-	err := userCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
+	err := userCollection.FindOne(context.Background(), bson.M{"email": email}).Decode(&user)
 	if err != nil {
-		log.Println("Database Error: Kullanıcı bulunamadı veya veritabanı hatası:", err)
-		http.Error(w, "Kullanıcı bulunamadı veya veritabanı hatası", http.StatusUnauthorized)
+		http.Error(w, "Kullanıcı bulunamadı veya veritabanı hatası", http.StatusNotFound)
 		return
 	}
 
-	// Kullanıcıyı JSON formatında döndür
-	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(user)
 }
 
@@ -144,12 +155,9 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(users)
 }
 
-// handlers/user.go
-
 func UpdateUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Gelen veriyi çözümle
 	var users []models.User
 	err := json.NewDecoder(r.Body).Decode(&users)
 	if err != nil {
@@ -160,9 +168,7 @@ func UpdateUsers(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Her kullanıcı için güncelleme işlemi
 	for _, user := range users {
-		// Güncelleme için filtre ve update değerleri oluşturuluyor
 		filter := bson.M{"_id": user.ID}
 		update := bson.M{"$set": bson.M{
 			"name":         user.Name,
@@ -175,8 +181,7 @@ func UpdateUsers(w http.ResponseWriter, r *http.Request) {
 			"updatedAt":    time.Now(),
 		}}
 
-		// Güncelleme işlemini gerçekleştirme
-		opts := options.Update().SetUpsert(true) // Eğer kayıt yoksa oluşturabilir
+		opts := options.Update().SetUpsert(true)
 		_, err := userCollection.UpdateOne(ctx, filter, update, opts)
 		if err != nil {
 			log.Printf("Güncelleme hatası: %v", err)
@@ -185,7 +190,32 @@ func UpdateUsers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Başarılı güncelleme yanıtı
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Kullanıcılar başarıyla güncellendi"})
+}
+
+func UpdateUserProfile(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var user models.User
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, "Invalid data format", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"email": user.Email}
+	update := bson.M{"$set": user}
+
+	_, err = userCollection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		http.Error(w, "Database update error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "User updated successfully"})
 }
