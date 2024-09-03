@@ -219,3 +219,60 @@ func UpdateUserProfile(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User updated successfully"})
 }
+
+func SuperUserLogin(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var creds struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	// Decode the request body into creds struct
+	err := json.NewDecoder(r.Body).Decode(&creds)
+	if err != nil {
+		http.Error(w, "Invalid data format", http.StatusBadRequest)
+		return
+	}
+
+	// Find the user by email
+	var user models.User
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = userCollection.FindOne(ctx, bson.M{"email": creds.Email}).Decode(&user)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusUnauthorized)
+		return
+	}
+
+	// Check if the password matches
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(creds.Password))
+	if err != nil {
+		http.Error(w, "Invalid password", http.StatusUnauthorized)
+		return
+	}
+
+	// Check if the user is a SuperUser
+	if !user.SuperUser {
+		http.Error(w, "Access denied: User is not a SuperUser", http.StatusForbidden)
+		return
+	}
+
+	// Create JWT token
+	expirationTime := time.Now().Add(24 * time.Hour)
+	claims := &jwt.StandardClaims{
+		ExpiresAt: expirationTime.Unix(),
+		Subject:   user.ID.Hex(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte("your_secret_key"))
+	if err != nil {
+		http.Error(w, "Could not create token", http.StatusInternalServerError)
+		return
+	}
+
+	// Return the token
+	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
+}

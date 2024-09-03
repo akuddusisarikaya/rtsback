@@ -19,28 +19,29 @@ func main() {
 
 	r := mux.NewRouter()
 	protected := r.PathPrefix("/protected").Subrouter()
+	superuser := r.PathPrefix("/superuser").Subrouter()
 	protected.Use(middlewares.JwtVerify) // JWT doğrulama middleware'i ekle
 
 	// Genel Rotlar
 	r.HandleFunc("/user", handlers.CreateUser).Methods("POST")
 	r.HandleFunc("/login", handlers.Login).Methods("POST")
 	r.HandleFunc("/adminlogin", handlers.LoginAdmin).Methods("POST")
-	r.HandleFunc("/appointment", handlers.CreateAppointment).Methods("POST")
-	r.HandleFunc("/prices", handlers.GetPrices).Methods("GET")
+	r.HandleFunc("/superuserlogin", handlers.SuperUserLogin).Methods("POST")
 
 	// Korumalı Rotlar
 	protected.HandleFunc("/userprofile", handlers.GetUserProfile).Methods("GET")
 	protected.HandleFunc("/appointments", handlers.GetAppointments).Methods("GET")
-	protected.HandleFunc("/users", handlers.GetUsers).Methods("GET")
-	protected.HandleFunc("/users/update", handlers.UpdateUsers).Methods("PUT") // Aynı endpoint üzerinde hem GET hem PUT olmamalı
-	protected.HandleFunc("/admins", handlers.GetAdmins).Methods("GET")
-	protected.HandleFunc("/companies", handlers.GetCompanies).Methods("GET")
-	protected.HandleFunc("/companies", handlers.AddCompany).Methods("POST")
-	protected.HandleFunc("/admins", handlers.AddAdmin).Methods("POST")
-	protected.HandleFunc("/companies/update", handlers.UpdateCompanies).Methods("PUT") // Aynı endpoint üzerinde hem GET hem PUT olmamalı
-	protected.HandleFunc("/admins/update", handlers.UpdateAdmins).Methods("PUT") // Aynı endpoint üzerinde hem GET hem PUT olmamalı
-	protected.HandleFunc("/user/update", handlers.UpdateUserProfile).Methods("PUT") // Aynı endpoint üzerinde hem GET hem PUT olmamalı
-	protected.HandleFunc("/admin", handlers.AdminPanel).Methods("GET")
+	superuser.HandleFunc("/users", handlers.GetUsers).Methods("GET")
+	superuser.HandleFunc("/users/update", handlers.UpdateUsers).Methods("PUT")
+	superuser.HandleFunc("/admins", handlers.GetAdmins).Methods("GET")
+	superuser.HandleFunc("/companies", handlers.GetCompanies).Methods("GET")
+	superuser.HandleFunc("/companies", handlers.AddCompany).Methods("POST")
+	superuser.HandleFunc("/admins", handlers.AddAdmin).Methods("POST")
+	superuser.HandleFunc("/company/update", handlers.UpdateCompanyByName).Methods("PUT")
+	superuser.HandleFunc("/admins/update", handlers.UpdateAdminByEmail).Methods("PUT")
+	superuser.HandleFunc("/adminsget", handlers.GetAdminByEmail).Methods("GET")
+	superuser.HandleFunc("/companyget", handlers.GetCompanyByName).Methods("GET")
+	protected.HandleFunc("/user/update", handlers.UpdateUserProfile).Methods("PUT")
 
 	// CORS Ayarları
 	corsRouter := middlewares.EnableCORS(r)

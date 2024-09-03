@@ -177,10 +177,82 @@ func UpdateAdmins(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "Adminler başarıyla güncellendi"})
 }
 
-func AdminPanel(w http.ResponseWriter, r *http.Request) {
 
+func GetAdminByEmail(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// URL parametrelerinden email'i al
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		http.Error(w, "Email parametresi eksik", http.StatusBadRequest)
+		return
+	}
+
+	// Admin bilgisini tutacak değişken
+	var admin models.Admin
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Email ile admini bul
+	err := adminCollection.FindOne(ctx, bson.M{"email": email}).Decode(&admin)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			http.Error(w, "Admin bulunamadı", http.StatusNotFound)
+		} else {
+			http.Error(w, "Veritabanı hatası", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Admin bilgilerini JSON formatında döner
+	json.NewEncoder(w).Encode(admin)
 }
 
-func GetPrices(w http.ResponseWriter, r *http.Request) {
+func UpdateAdminByEmail(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 
+	// URL parametrelerinden email'i al
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		http.Error(w, "Email parametresi eksik", http.StatusBadRequest)
+		return
+	}
+
+	// Güncellenecek admin bilgisini al
+	var updatedAdmin models.Admin
+	err := json.NewDecoder(r.Body).Decode(&updatedAdmin)
+	if err != nil {
+		http.Error(w, "Geçersiz veri formatı", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Güncelleme verisi
+	update := bson.M{
+		"$set": bson.M{
+			"name":      updatedAdmin.Name,
+			"password":  updatedAdmin.Password, // Şifre güncelleniyorsa hash'lenmiş şekilde gelmeli
+			"role":      updatedAdmin.Role,
+			"updatedAt": time.Now(),
+		},
+	}
+
+	// Email ile admini güncelle
+	result, err := adminCollection.UpdateOne(ctx, bson.M{"email": email}, update)
+	if err != nil {
+		http.Error(w, "Veritabanı güncelleme hatası", http.StatusInternalServerError)
+		return
+	}
+
+	// Eğer güncelleme yapılmadıysa
+	if result.MatchedCount == 0 {
+		http.Error(w, "Admin bulunamadı", http.StatusNotFound)
+		return
+	}
+
+	// Başarılı yanıt
+	json.NewEncoder(w).Encode(map[string]string{"message": "Admin başarıyla güncellendi"})
 }

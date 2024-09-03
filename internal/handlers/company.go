@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var companyCollection *mongo.Collection
@@ -95,4 +96,69 @@ func UpdateCompanies(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Şirketler başarıyla güncellendi"})
+}
+
+
+func GetCompanyByName(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+
+    // Query parameterden şirket ismini al
+    companyName := r.URL.Query().Get("name")
+    if companyName == "" {
+        http.Error(w, "Şirket adı gerekli", http.StatusBadRequest)
+        return
+    }
+
+    var company models.Company
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    // MongoDB'de şirketi isme göre ara
+    err := companyCollection.FindOne(ctx, bson.M{"name": companyName}).Decode(&company)
+    if err != nil {
+        http.Error(w, "Şirket bulunamadı", http.StatusNotFound)
+        return
+    }
+
+    json.NewEncoder(w).Encode(company)
+}
+
+func UpdateCompanyByName(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var updatedCompany models.Company
+	err := json.NewDecoder(r.Body).Decode(&updatedCompany)
+	if err != nil {
+		http.Error(w, "Geçersiz veri formatı", http.StatusBadRequest)
+		return
+	}
+
+	// Şirket ismi boş ise hata döndür
+	if updatedCompany.Name == "" {
+		http.Error(w, "Şirket adı gerekli", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Şirket ismi ile güncelleme yap
+	filter := bson.M{"name": updatedCompany.Name}
+	update := bson.M{"$set": updatedCompany}
+
+	opts := options.Update().SetUpsert(false) // Eğer şirket yoksa oluşturulmasın
+	result, err := companyCollection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		http.Error(w, "Şirket güncellenemedi", http.StatusInternalServerError)
+		return
+	}
+
+	// Hiçbir belge güncellenmediyse, hata mesajı döndür
+	if result.MatchedCount == 0 {
+		http.Error(w, "Şirket bulunamadı", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Şirket başarıyla güncellendi"})
 }
