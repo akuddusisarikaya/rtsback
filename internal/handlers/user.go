@@ -267,7 +267,7 @@ func SuperUserLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte("your_secret_key"))
+	tokenString, err := token.SignedString([]byte("super_user_secret_key"))
 	if err != nil {
 		http.Error(w, "Could not create token", http.StatusInternalServerError)
 		return

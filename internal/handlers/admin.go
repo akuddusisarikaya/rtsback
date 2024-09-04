@@ -65,7 +65,7 @@ func LoginAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte("your_secret_key"))
+	tokenString, err := token.SignedString([]byte("admin_secret_key"))
 	if err != nil {
 		http.Error(w, "Token oluşturulamadı", http.StatusInternalServerError)
 		return

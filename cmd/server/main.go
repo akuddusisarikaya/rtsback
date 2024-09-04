@@ -20,15 +20,26 @@ func main() {
 	r := mux.NewRouter()
 	protected := r.PathPrefix("/protected").Subrouter()
 	superuser := r.PathPrefix("/superuser").Subrouter()
+	admin := r.PathPrefix("/admin").Subrouter()
+	provider := r.PathPrefix("/provider").Subrouter()
 	protected.Use(middlewares.JwtVerify) // JWT doğrulama middleware'i ekle
+	admin.Use(middlewares.AdminJWT)
+	superuser.Use(middlewares.SuperUserJWT)
+	provider.Use(middlewares.ProviderJWT)
 
 	// Genel Rotlar
 	r.HandleFunc("/user", handlers.CreateUser).Methods("POST")
 	r.HandleFunc("/login", handlers.Login).Methods("POST")
+	r.HandleFunc("/provider/login", handlers.ProviderLogin).Methods("POST")
 	r.HandleFunc("/adminlogin", handlers.LoginAdmin).Methods("POST")
 	r.HandleFunc("/superuserlogin", handlers.SuperUserLogin).Methods("POST")
 
+
 	// Korumalı Rotlar
+	admin.HandleFunc("/provider/add", handlers.AddProvider).Methods("POST")
+	provider.HandleFunc("/getbyemail", handlers.GetProviderByEmail).Methods("GET")
+	provider.HandleFunc("/providers", handlers.GetProviders).Methods("GET")
+	admin.HandleFunc("/manager/add", handlers.AddManager).Methods("POST")
 	protected.HandleFunc("/userprofile", handlers.GetUserProfile).Methods("GET")
 	protected.HandleFunc("/appointments", handlers.GetAppointments).Methods("GET")
 	superuser.HandleFunc("/users", handlers.GetUsers).Methods("GET")
@@ -41,7 +52,7 @@ func main() {
 	superuser.HandleFunc("/admins/update", handlers.UpdateAdminByEmail).Methods("PUT")
 	superuser.HandleFunc("/adminsget", handlers.GetAdminByEmail).Methods("GET")
 	superuser.HandleFunc("/companyget", handlers.GetCompanyByName).Methods("GET")
-	protected.HandleFunc("/user/update", handlers.UpdateUserProfile).Methods("PUT")
+	admin.HandleFunc("/user/update", handlers.UpdateUserProfile).Methods("PUT")
 
 	// CORS Ayarları
 	corsRouter := middlewares.EnableCORS(r)
