@@ -14,7 +14,7 @@ type Provider struct {
 	Phone       string             `bson:"phone,omitempty"`
 	Role        string             `bson:"role,omitempty"`
 	Services    []string           `bson:"services,omitempty"`
-	CompanyName string             `bson:"company_id,omitempty"`
+	CompanyName string             `bson:"company_name,omitempty"`
 	CreatedAt   time.Time          `bson:"created_at,omitempty"`
 	UpdatedAt   time.Time          `bson:"updated_at,omitempty"`
 }

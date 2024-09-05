@@ -34,7 +34,6 @@ func main() {
 	r.HandleFunc("/adminlogin", handlers.LoginAdmin).Methods("POST")
 	r.HandleFunc("/superuserlogin", handlers.SuperUserLogin).Methods("POST")
 
-
 	// Korumalı Rotlar
 	admin.HandleFunc("/provider/add", handlers.AddProvider).Methods("POST")
 	provider.HandleFunc("/getbyemail", handlers.GetProviderByEmail).Methods("GET")
@@ -50,10 +49,14 @@ func main() {
 	superuser.HandleFunc("/admins", handlers.AddAdmin).Methods("POST")
 	superuser.HandleFunc("/company/update", handlers.UpdateCompanyByName).Methods("PUT")
 	superuser.HandleFunc("/admins/update", handlers.UpdateAdminByEmail).Methods("PUT")
-	superuser.HandleFunc("/adminsget", handlers.GetAdminByEmail).Methods("GET")
+	admin.HandleFunc("/adminsget", handlers.GetAdminByEmail).Methods("GET")
 	superuser.HandleFunc("/companyget", handlers.GetCompanyByName).Methods("GET")
 	admin.HandleFunc("/user/update", handlers.UpdateUserProfile).Methods("PUT")
-
+	provider.HandleFunc("/getappointments", handlers.GetProviderAppointments).Methods("GET")
+	provider.HandleFunc("/getcompanyforprovider", handlers.GetCompanyNameByProviderEmail).Methods("GET")
+	provider.HandleFunc("/addproviderapp", handlers.AddProviderApp).Methods("POST")
+	provider.HandleFunc("/updateapp", handlers.UpdateAppointmentByID).Methods("PUT")
+	provider.HandleFunc("/deleteapp", handlers.DeleteAppointmentByID).Methods("DELETE")
 	// CORS Ayarları
 	corsRouter := middlewares.EnableCORS(r)
 

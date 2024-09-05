@@ -173,3 +173,28 @@ func GetProviderByEmail(w http.ResponseWriter, r *http.Request) {
 	// Successfully found the provider, send it in response
 	json.NewEncoder(w).Encode(provider)
 }
+
+func GetCompanyNameByProviderEmail(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Query parametrelerinden e-posta değerini al
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		http.Error(w, "Email parameter is missing", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Sağlayıcıyı email üzerinden bul
+	var provider models.Provider
+	err := providerCollection.FindOne(ctx, bson.M{"email": email}).Decode(&provider)
+	if err != nil {
+		http.Error(w, "Provider not found", http.StatusNotFound)
+		return
+	}
+
+	// Şirket bilgilerini JSON formatında yanıt olarak gönder
+	json.NewEncoder(w).Encode(provider.CompanyName)
+}
