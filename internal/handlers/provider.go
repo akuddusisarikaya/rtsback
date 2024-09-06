@@ -13,102 +13,105 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 )
 
 var providerCollection *mongo.Collection
 
 func init() {
-    client := config.ConnectDB()
-    providerCollection = config.GetCollection(client, "provider")
+	client := config.ConnectDB()
+	providerCollection = config.GetCollection(client, "provider")
 }
 
 // AddProvider handles adding a new provider to the database
 func AddProvider(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
 
-    var provider models.Provider
-    err := json.NewDecoder(r.Body).Decode(&provider)
-    if err != nil {
-        http.Error(w, "Invalid data format", http.StatusBadRequest)
-        return
-    }
+	var provider models.Provider
+	err := json.NewDecoder(r.Body).Decode(&provider)
+	if err != nil {
+		http.Error(w, "Invalid data format", http.StatusBadRequest)
+		return
+	}
 
-    // Hash the password before storing
-    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(provider.Password), bcrypt.DefaultCost)
-    if err != nil {
-        http.Error(w, "Failed to hash password", http.StatusInternalServerError)
-        return
-    }
-    provider.Password = string(hashedPassword)
+	// Hash the password before storing
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(provider.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+		return
+	}
+	provider.Password = string(hashedPassword)
 
-    // Assign a new ObjectID and timestamps
-    provider.ID = primitive.NewObjectID()
-    provider.CreatedAt = time.Now()
-    provider.UpdatedAt = time.Now()
+	// Assign a new ObjectID and timestamps
+	provider.ID = primitive.NewObjectID()
+	provider.CreatedAt = time.Now()
+	provider.UpdatedAt = time.Now()
 
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-    _, err = providerCollection.InsertOne(ctx, provider)
-    if err != nil {
-        http.Error(w, "Failed to add provider to the database", http.StatusInternalServerError)
-        return
-    }
+	_, err = providerCollection.InsertOne(ctx, provider)
+	if err != nil {
+		http.Error(w, "Failed to add provider to the database", http.StatusInternalServerError)
+		return
+	}
 
-    w.WriteHeader(http.StatusCreated)
-    json.NewEncoder(w).Encode(map[string]string{"message": "Provider added successfully"})
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Provider added successfully"})
 }
 
 // ProviderLogin handles provider login requests
 func ProviderLogin(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
 
-    var creds struct {
-        Email    string `json:"email"`
-        Password string `json:"password"`
-    }
+	var creds struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
 
-    err := json.NewDecoder(r.Body).Decode(&creds)
-    if err != nil {
-        http.Error(w, "Invalid data format", http.StatusBadRequest)
-        return
-    }
+	err := json.NewDecoder(r.Body).Decode(&creds)
+	if err != nil {
+		http.Error(w, "Invalid data format", http.StatusBadRequest)
+		return
+	}
 
-    var provider models.Provider
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
+	var provider models.Provider
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-    // Email ile provider'ı bul
-    err = providerCollection.FindOne(ctx, bson.M{"email": creds.Email}).Decode(&provider)
-    if err != nil {
-        http.Error(w, "Provider not found", http.StatusUnauthorized)
-        return
-    }
+	// Email ile provider'ı bul
+	err = providerCollection.FindOne(ctx, bson.M{"email": creds.Email}).Decode(&provider)
+	if err != nil {
+		http.Error(w, "Provider not found", http.StatusUnauthorized)
+		return
+	}
 
-    // Şifreyi doğrula
-    err = bcrypt.CompareHashAndPassword([]byte(provider.Password), []byte(creds.Password))
-    if err != nil {
-        http.Error(w, "Invalid password", http.StatusUnauthorized)
-        return
-    }
+	// Şifreyi doğrula
+	err = bcrypt.CompareHashAndPassword([]byte(provider.Password), []byte(creds.Password))
+	if err != nil {
+		http.Error(w, "Invalid password", http.StatusUnauthorized)
+		return
+	}
 
-    // JWT token oluşturma
-    expirationTime := time.Now().Add(24 * time.Hour)
-    claims := &jwt.StandardClaims{
-        ExpiresAt: expirationTime.Unix(),
-        Subject:   provider.ID.Hex(),
-    }
+	// JWT token oluşturma
+	expirationTime := time.Now().Add(24 * time.Hour)
+	claims := &jwt.StandardClaims{
+		ExpiresAt: expirationTime.Unix(),
+		Subject:   provider.ID.Hex(),
+	}
 
-    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte("provider_secret_key"))
 	if err != nil {
 		http.Error(w, "Token oluşturulamadı", http.StatusInternalServerError)
 		return
 	}
 
-    // Başarılı yanıt ve token gönder
-    json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
+	providerID := provider.ID.Hex()
+
+	// Başarılı yanıt ve token gönder
+	json.NewEncoder(w).Encode(map[string]string{"token": tokenString, "ID": providerID})
 }
 
 func GetProviders(w http.ResponseWriter, r *http.Request) {
@@ -197,4 +200,41 @@ func GetCompanyNameByProviderEmail(w http.ResponseWriter, r *http.Request) {
 
 	// Şirket bilgilerini JSON formatında yanıt olarak gönder
 	json.NewEncoder(w).Encode(provider.CompanyName)
+}
+
+func GetAppointmentsByProviderEmail(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Query parametresinden email'i al
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		http.Error(w, "Email parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	// MongoDB query için context oluştur
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Email'e göre filtreleme yap
+	filter := bson.M{"provider_email": email}
+
+	// Randevuları filtreye göre bul
+	cursor, err := appointmentCollection.Find(ctx, filter, options.Find())
+	if err != nil {
+		http.Error(w, "Failed to fetch appointments", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	// Randevuları bir slice'a decode et
+	var appointments []models.Appointment
+	if err = cursor.All(ctx, &appointments); err != nil {
+		http.Error(w, "Failed to decode appointments", http.StatusInternalServerError)
+		return
+	}
+
+	// Randevuları JSON formatında yanıtla
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(appointments)
 }

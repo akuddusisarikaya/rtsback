@@ -70,9 +70,10 @@ func LoginAdmin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Token oluşturulamadı", http.StatusInternalServerError)
 		return
 	}
+	adminID := (admin.ID).Hex()
 
 	// Yanıt
-	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
+	json.NewEncoder(w).Encode(map[string]string{"token": tokenString, "ID": adminID})
 }
 
 // Admin verilerini çekme
