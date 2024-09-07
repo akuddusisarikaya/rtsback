@@ -42,6 +42,7 @@ func main() {
 	provider.HandleFunc("/getbyemail", handlers.GetProviderByEmail).Methods("GET")
 	provider.HandleFunc("/providers", handlers.GetProviders).Methods("GET")
 	admin.HandleFunc("/manager/add", handlers.AddManager).Methods("POST")
+	provider.HandleFunc("/addappauto", handlers.AutoCreateAppointment).Methods("POST")
 	protected.HandleFunc("/userprofile", handlers.GetUserProfile).Methods("GET")
 	protected.HandleFunc("/appointments", handlers.GetAppointments).Methods("GET")
 	superuser.HandleFunc("/users", handlers.GetUsers).Methods("GET")

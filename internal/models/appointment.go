@@ -22,4 +22,13 @@ type Appointment struct {
 	CreatedAt     time.Time          `bson:"created_at,omitempty"`
 	UpdatedAt     time.Time          `bson:"updated_at,omitempty"`
 }
+
+type AutoAddRequest struct {
+	ProviderEmail string   `json:"providerEmail"`
+	CompanyName   string   `json:"companyName"`
+	Weekdays      []string `json:"weekdays"`     // Örneğin: ["Monday", "Wednesday"]
+	ShiftStart    string   `json:"shiftStart"`   // Örneğin: "09:00"
+	ShiftEnd      string   `json:"shiftEnd"`     // Örneğin: "17:00"
+	Period        int      `json:"period"`       // Dakika cinsinden periyot, örneğin: 30
+}
  

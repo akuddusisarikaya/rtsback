@@ -43,6 +43,78 @@ func GetAppointments(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(appointments)
 }
+func contains(slice []string, item string) bool {
+    for _, v := range slice {
+        if v == item {
+            return true
+        }
+    }
+    return false
+}
+func AutoCreateAppointment(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    
+    var autoAdd models.AutoAddRequest
+    err := json.NewDecoder(r.Body).Decode(&autoAdd)
+    if err != nil {
+        http.Error(w, "Geçersiz veri formatı", http.StatusBadRequest)
+        return
+    }
+
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    // Geçerli tarihi al ve bir ay sonrasını hesapla
+    currentDate := time.Now()
+    endDate := currentDate.AddDate(0, 1, 0) // Bir ay sonrası
+
+    // Belirtilen günlerde ve saatlerde randevu oluşturma işlemi
+    for currentDate.Before(endDate) {
+        currentWeekday := currentDate.Weekday().String()
+
+        // Eğer geçerli gün belirtilen günler arasında varsa, randevu oluştur
+        if contains(autoAdd.Weekdays, currentWeekday) {
+            startTime, _ := time.Parse("15:04", autoAdd.ShiftStart)
+            endTime, _ := time.Parse("15:04", autoAdd.ShiftEnd)
+
+            start := time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(),
+                startTime.Hour(), startTime.Minute(), 0, 0, currentDate.Location())
+
+            end := time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(),
+                endTime.Hour(), endTime.Minute(), 0, 0, currentDate.Location())
+
+            for start.Before(end) {
+                appointment := models.Appointment{
+                    ID:            primitive.NewObjectID(),
+                    ProviderEmail: autoAdd.ProviderEmail,
+                    CompanyName:   autoAdd.CompanyName,
+                    Date:          start,
+                    StartTime:     start,
+                    EndTime:       start.Add(time.Duration(autoAdd.Period) * time.Minute),
+                    Activate:      false,
+                    CreatedAt:     time.Now(),
+                    UpdatedAt:     time.Now(),
+                }
+
+                // Randevuyu MongoDB'ye ekle
+                _, err := appointmentCollection.InsertOne(ctx, appointment)
+                if err != nil {
+                    http.Error(w, "Veritabanına randevu eklenemedi", http.StatusInternalServerError)
+                    return
+                }
+
+                // Başlangıç saatini periyot kadar artır
+                start = start.Add(time.Duration(autoAdd.Period) * time.Minute)
+            }
+        }
+
+        // Tarihi bir gün ileri al
+        currentDate = currentDate.AddDate(0, 0, 1)
+    }
+
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(map[string]string{"message": "Otomatik randevular başarıyla oluşturuldu"})
+}
 
 func CreateAppointment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
