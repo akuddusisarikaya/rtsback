@@ -36,6 +36,8 @@ func main() {
 	r.HandleFunc("/adminlogin", handlers.LoginAdmin).Methods("POST")
 	r.HandleFunc("/superuserlogin", handlers.SuperUserLogin).Methods("POST")
 	r.HandleFunc("/managerlogin", handlers.ManagerLogin).Methods("POST")
+	r.HandleFunc("/getproviderbycompany", handlers.GetProvidersByCompanyId).Methods("GET")
+	r.HandleFunc("/getprovidersapp", handlers.GetInactiveAppointmentsOfProvider).Methods("GET")
 
 	// Korumalı Rotlar
 	admin.HandleFunc("/provider/add", handlers.AddProvider).Methods("POST")
@@ -64,6 +66,7 @@ func main() {
 	provider.HandleFunc("/deleteapp", handlers.DeleteAppointmentByID).Methods("DELETE")
 	provider.HandleFunc("/getallproviderapp", handlers.GetAppointmentsByProviderEmail).Methods("GET")
 	admin.HandleFunc("/getallproviderapp", handlers.GetAppointmentsByProviderEmail).Methods("GET")
+	admin.HandleFunc("/getcompanybyid", handlers.GetCompanyByID).Methods("GET")
 
 	// CORS Ayarları
 	corsRouter := middlewares.EnableCORS(r)

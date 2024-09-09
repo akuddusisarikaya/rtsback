@@ -360,3 +360,59 @@ func DeleteAppointmentByID(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Appointment deleted successfully"})
 }
+
+func GetInactiveAppointmentsOfProvider(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// URL'den `providerEmail` ve `date` parametrelerini al
+	providerEmail := r.URL.Query().Get("providerEmail")
+	date := r.URL.Query().Get("date")
+
+	if providerEmail == "" || date == "" {
+		http.Error(w, "Provider Email and date are required", http.StatusBadRequest)
+		return
+	}
+
+	// Tarihi parse et
+	parsedDate, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		http.Error(w, "Invalid date format, expected YYYY-MM-DD", http.StatusBadRequest)
+		return
+	}
+
+	// Tarihin başlangıcı ve bitişi
+	startOfDay := time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, time.UTC)
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	// Veritabanı sorgusu: providerEmail'e, tarihe ve activate=false olma durumuna göre
+	filter := bson.M{
+		"provider_email": providerEmail,
+		"date": bson.M{
+			"$gte": startOfDay,
+			"$lt":  endOfDay,
+		},
+		"activate": false,
+	}
+
+	// Randevuları çek
+	var appointments []models.Appointment
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cursor, err := appointmentCollection.Find(ctx, filter)
+	if err != nil {
+		http.Error(w, "Failed to fetch appointments", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	// Cursor'u slice'a dekode et
+	if err = cursor.All(ctx, &appointments); err != nil {
+		http.Error(w, "Failed to decode appointments", http.StatusInternalServerError)
+		return
+	}
+
+	// Randevuları JSON formatında döndür
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(appointments)
+}

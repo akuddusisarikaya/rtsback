@@ -17,18 +17,18 @@ type Appointment struct {
 	Date          time.Time          `bson:"date,omitempty"`
 	StartTime     time.Time          `bson:"start_time,omitempty"`
 	EndTime       time.Time          `bson:"end_time,omitempty"`
-	Activate      bool               `bson:"activate,omitempty"`
+	Activate      bool               `bson:"activate"`
 	Notes         string             `bson:"notes,omitempty"`
 	CreatedAt     time.Time          `bson:"created_at,omitempty"`
 	UpdatedAt     time.Time          `bson:"updated_at,omitempty"`
 }
 
 type AutoAddRequest struct {
-	ProviderEmail string   `json:"providerEmail"`
-	CompanyName   string   `json:"companyName"`
-	Weekdays      []string `json:"weekdays"`     // Örneğin: ["Monday", "Wednesday"]
-	ShiftStart    string   `json:"shiftStart"`   // Örneğin: "09:00"
-	ShiftEnd      string   `json:"shiftEnd"`     // Örneğin: "17:00"
-	Period        int      `json:"period"`       // Dakika cinsinden periyot, örneğin: 30
+	ProviderEmail string   `bson:"providerEmail,omitempty"`
+	CompanyName   string   `bson:"companyName,omitempty"`
+	Weekdays      []string `bson:"weekdays,omitempty"`   // Örneğin: ["Monday", "Wednesday"]
+	ShiftStart    string   `bson:"shiftStart,omitempty"` // Örneğin: "09:00"
+	ShiftEnd      string   `bson:"shiftEnd,omitempty"`   // Örneğin: "17:00"
+	Period        int      `bson:"period,omitempty"`     // Dakika cinsinden periyot, örneğin: 30
+	Activate      bool     `bson:"activate"`
 }
- 

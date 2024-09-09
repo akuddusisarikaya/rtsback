@@ -238,3 +238,37 @@ func GetAppointmentsByProviderEmail(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(appointments)
 }
+
+func GetProvidersByCompanyId(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// URL'den `companyID` parametresini al
+	companyID := r.URL.Query().Get("companyID")
+	if companyID == "" {
+		http.Error(w, "Company ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Sağlayıcıları veritabanından çek
+	var providers []models.Provider
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// `companyID`'yi string olarak kullanarak sorgu yapıyoruz
+	cursor, err := providerCollection.Find(ctx, bson.M{"company_id": companyID})
+	if err != nil {
+		http.Error(w, "Failed to fetch providers", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	// Cursor'u slice'a dekode et
+	if err = cursor.All(ctx, &providers); err != nil {
+		http.Error(w, "Failed to decode providers", http.StatusInternalServerError)
+		return
+	}
+
+	// Sağlayıcıları JSON formatında döndür
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(providers)
+}

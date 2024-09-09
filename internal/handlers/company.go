@@ -162,3 +162,40 @@ func UpdateCompanyByName(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Şirket başarıyla güncellendi"})
 }
+
+func GetCompanyByID(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// URL'den `companyID` parametresini al
+	companyID := r.URL.Query().Get("companyID")
+	if companyID == "" {
+		http.Error(w, "Company ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// `companyID` string'ini `ObjectID`'ye çevir
+	objID, err := primitive.ObjectIDFromHex(companyID)
+	if err != nil {
+		http.Error(w, "Invalid Company ID", http.StatusBadRequest)
+		return
+	}
+
+	// Şirket bilgilerini veritabanından çek
+	var company models.Company
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = companyCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&company)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			http.Error(w, "Company not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to fetch company information", http.StatusInternalServerError)
+		return
+	}
+
+	// Şirket bilgilerini JSON formatında döndür
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(company)
+}
