@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"rtsback/config"
@@ -271,4 +272,187 @@ func GetProvidersByCompanyId(w http.ResponseWriter, r *http.Request) {
 	// Sağlayıcıları JSON formatında döndür
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(providers)
+}
+
+func AddServiceToProvider(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// `providerID` parametresini al
+	providerID := r.URL.Query().Get("providerID")
+	if providerID == "" {
+		http.Error(w, "Provider ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// ObjectID'yi doğrula
+	objID, err := primitive.ObjectIDFromHex(providerID)
+	if err != nil {
+		http.Error(w, "Invalid Provider ID", http.StatusBadRequest)
+		return
+	}
+
+	type ServiceRequest struct {
+		Services []string `json:"services"`
+	}
+
+	var serviceReq ServiceRequest
+
+	// İstek gövdesini çözümle
+	err = json.NewDecoder(r.Body).Decode(&serviceReq)
+	if err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Mevcut sağlayıcıyı veritabanından bul
+	var provider models.Provider
+	err = providerCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&provider)
+	if err != nil {
+		http.Error(w, "Provider not found", http.StatusNotFound)
+		return
+	}
+
+	// Yeni hizmetleri mevcut hizmetler ile birleştir
+	existingServices := provider.Services
+	for _, newService := range serviceReq.Services {
+		if !contains(existingServices, newService) { // Eğer mevcut değilse ekle
+			existingServices = append(existingServices, newService)
+		}
+	}
+
+	// Güncellemeyi MongoDB'ye gönder
+	update := bson.M{
+		"$set": bson.M{
+			"services":   existingServices,
+			"updated_at": time.Now(),
+		},
+	}
+
+	result, err := providerCollection.UpdateOne(ctx, bson.M{"_id": objID}, update)
+	if err != nil {
+		http.Error(w, "Failed to update provider services", http.StatusInternalServerError)
+		return
+	}
+
+	if result.MatchedCount == 0 {
+		http.Error(w, "Provider not found", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Service added successfully to the provider"})
+}
+
+func GetServicesOfProvider(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// URL'den `providerID` parametresini al
+	providerID := r.URL.Query().Get("providerID")
+	if providerID == "" {
+		http.Error(w, "Provider ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// `providerID` string'ini `ObjectID`'ye çevir
+	objID, err := primitive.ObjectIDFromHex(providerID)
+	if err != nil {
+		http.Error(w, "Invalid Provider ID", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Veritabanından provider'ı çek
+	var provider models.Provider
+	err = providerCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&provider)
+	if err != nil {
+		http.Error(w, "Provider not found", http.StatusNotFound)
+		return
+	}
+
+	// Servisleri indeksleriyle birlikte hazırlamak için bir dizi oluştur
+	type ServiceWithIndex struct {
+		Index   int    `json:"index"`
+		Service string `json:"service"`
+	}
+
+	var servicesWithIndex []ServiceWithIndex
+	for i, service := range provider.Services {
+		servicesWithIndex = append(servicesWithIndex, ServiceWithIndex{
+			Index:   i,
+			Service: service,
+		})
+	}
+
+	// Servisleri JSON formatında döndür
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(servicesWithIndex)
+}
+
+func RemoveServiceFromProvider(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// URL'den `providerID` ve `index` parametrelerini al
+	providerID := r.URL.Query().Get("providerID")
+	indexStr := r.URL.Query().Get("index")
+
+	if providerID == "" || indexStr == "" {
+		http.Error(w, "Provider ID and index are required", http.StatusBadRequest)
+		return
+	}
+
+	// Provider ID'yi ObjectID'ye çevir
+	objID, err := primitive.ObjectIDFromHex(providerID)
+	if err != nil {
+		http.Error(w, "Invalid Provider ID", http.StatusBadRequest)
+		return
+	}
+
+	// Index'i integer olarak parse et
+	index, err := strconv.Atoi(indexStr)
+	if err != nil || index < 0 {
+		http.Error(w, "Invalid index", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Provider'ı veritabanından bul
+	var provider struct {
+		Services []string `bson:"services"`
+	}
+
+	err = providerCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&provider)
+	if err != nil {
+		http.Error(w, "Provider not found", http.StatusNotFound)
+		return
+	}
+
+	// Eğer index geçersizse, hata döndür
+	if index >= len(provider.Services) {
+		http.Error(w, "Index out of range", http.StatusBadRequest)
+		return
+	}
+
+	// Belirtilen indexteki öğeyi sil
+	provider.Services = append(provider.Services[:index], provider.Services[index+1:]...)
+
+	// Güncellenmiş services dizisini veritabanına kaydet
+	update := bson.M{
+		"$set": bson.M{"services": provider.Services},
+	}
+
+	_, err = providerCollection.UpdateOne(ctx, bson.M{"_id": objID}, update)
+	if err != nil {
+		http.Error(w, "Failed to update provider services", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Service removed successfully"})
 }

@@ -155,6 +155,38 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(users)
 }
 
+func GetUserByEmail(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// URL'den email parametresini al
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		http.Error(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	// Kullanıcı modelini temsil eden yapı
+	var user models.User
+
+	// Kullanıcıyı veritabanından email'e göre çek
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err := userCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to fetch user", http.StatusInternalServerError)
+		return
+	}
+
+	// Kullanıcıyı JSON formatında döndür
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(user)
+}
+
 func UpdateUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -275,4 +307,46 @@ func SuperUserLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Return the token
 	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
+}
+
+func CreateUserWithoutPassword(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Kullanıcı modelini temsil eden yapı
+	type User struct {
+		ID        primitive.ObjectID `bson:"_id,omitempty"`
+		Email     string             `bson:"email,omitempty"`
+		FirstName string             `bson:"first_name,omitempty"`
+		Phone     string             `bson:"phone,omitempty"`
+		CreatedAt time.Time          `bson:"created_at,omitempty"`
+		UpdatedAt time.Time          `bson:"updated_at,omitempty"`
+	}
+
+	var user User
+
+	// JSON verisini parse et
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, "Geçersiz veri formatı", http.StatusBadRequest)
+		return
+	}
+
+	// ID, CreatedAt ve UpdatedAt alanlarını ayarla
+	user.ID = primitive.NewObjectID()
+	user.CreatedAt = time.Now()
+	user.UpdatedAt = time.Now()
+
+	// Kullanıcıyı veritabanına ekle
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err = userCollection.InsertOne(ctx, user)
+	if err != nil {
+		http.Error(w, "Kullanıcı eklenemedi", http.StatusInternalServerError)
+		return
+	}
+
+	// Başarılı mesajı döndür
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Kullanıcı başarıyla oluşturuldu"})
 }

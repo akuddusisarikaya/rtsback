@@ -199,3 +199,29 @@ func GetCompanyByID(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(company)
 }
+
+func GetAllCompanies(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var companies []models.Company
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Veritabanından tüm şirketleri çek
+	cursor, err := companyCollection.Find(ctx, bson.M{})
+	if err != nil {
+		http.Error(w, "Veri çekme hatası", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	// Cursor'u slice'a dekode et
+	if err = cursor.All(ctx, &companies); err != nil {
+		http.Error(w, "Veri çözümleme hatası", http.StatusInternalServerError)
+		return
+	}
+
+	// Şirketleri JSON formatında döndür
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(companies)
+}

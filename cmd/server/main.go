@@ -38,6 +38,10 @@ func main() {
 	r.HandleFunc("/managerlogin", handlers.ManagerLogin).Methods("POST")
 	r.HandleFunc("/getproviderbycompany", handlers.GetProvidersByCompanyId).Methods("GET")
 	r.HandleFunc("/getprovidersapp", handlers.GetInactiveAppointmentsOfProvider).Methods("GET")
+	r.HandleFunc("/getallcompanies", handlers.GetAllCompanies).Methods("GET")
+	r.HandleFunc("/makeappointment", handlers.UpdateAppointmentFieldsByID).Methods("PUT")
+	r.HandleFunc("/getuserbyemail", handlers.GetUserByEmail).Methods("GET")
+	r.HandleFunc("/createusernopassword", handlers.CreateUserWithoutPassword).Methods("POST")
 
 	// Korumalı Rotlar
 	admin.HandleFunc("/provider/add", handlers.AddProvider).Methods("POST")
@@ -67,6 +71,9 @@ func main() {
 	provider.HandleFunc("/getallproviderapp", handlers.GetAppointmentsByProviderEmail).Methods("GET")
 	admin.HandleFunc("/getallproviderapp", handlers.GetAppointmentsByProviderEmail).Methods("GET")
 	admin.HandleFunc("/getcompanybyid", handlers.GetCompanyByID).Methods("GET")
+	provider.HandleFunc("/addservices", handlers.AddServiceToProvider).Methods("PUT")
+	provider.HandleFunc("/getservicesforprovider", handlers.GetServicesOfProvider).Methods("GET")
+	provider.HandleFunc("/deleteservice", handlers.RemoveServiceFromProvider).Methods("DELETE")
 
 	// CORS Ayarları
 	corsRouter := middlewares.EnableCORS(r)
