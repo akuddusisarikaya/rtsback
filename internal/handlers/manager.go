@@ -107,3 +107,37 @@ func ManagerLogin(w http.ResponseWriter, r *http.Request) {
 	// Başarılı yanıt ve token gönder
 	json.NewEncoder(w).Encode(map[string]string{"token": tokenString, "ID": managerID})
 }
+
+func GetManagersByCompanyId(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// URL'den `companyID` parametresini al
+	companyID := r.URL.Query().Get("companyID")
+	if companyID == "" {
+		http.Error(w, "Company ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Sağlayıcıları veritabanından çek
+	var managers []models.Manager
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// `companyID`'yi string olarak kullanarak sorgu yapıyoruz
+	cursor, err := managerCollection.Find(ctx, bson.M{"company_id": companyID})
+	if err != nil {
+		http.Error(w, "Failed to fetch providers", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	// Cursor'u slice'a dekode et
+	if err = cursor.All(ctx, &managers); err != nil {
+		http.Error(w, "Failed to decode providers", http.StatusInternalServerError)
+		return
+	}
+
+	// Sağlayıcıları JSON formatında döndür
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(managers)
+}

@@ -200,7 +200,7 @@ func GetCompanyNameByProviderEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Şirket bilgilerini JSON formatında yanıt olarak gönder
-	json.NewEncoder(w).Encode(provider.CompanyName)
+	json.NewEncoder(w).Encode(provider)
 }
 
 func GetAppointmentsByProviderEmail(w http.ResponseWriter, r *http.Request) {

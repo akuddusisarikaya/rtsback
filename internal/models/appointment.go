@@ -12,7 +12,8 @@ type Appointment struct {
 	ProviderEmail string             `bson:"provider_email,omitempty"`
 	CustomerName  string             `bson:"customer_name,omitempty"`
 	ProviderName  string             `bson:"provider_name,omitempty"`
-	CompanyName   string             `bson:"company_id,omitempty"`
+	CompanyName   string             `bson:"company_name,omitempty"`
+	CompanyID	  string			 `bson:"company_id,omitempty"`
 	Services      []string           `bson:"services,omitempty"`
 	Date          time.Time          `bson:"date,omitempty"`
 	StartTime     time.Time          `bson:"start_time,omitempty"`

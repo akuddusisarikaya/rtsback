@@ -43,6 +43,7 @@ func main() {
 	r.HandleFunc("/getuserbyemail", handlers.GetUserByEmail).Methods("GET")
 	r.HandleFunc("/createusernopassword", handlers.CreateUserWithoutPassword).Methods("POST")
 
+
 	// Korumalı Rotlar
 	admin.HandleFunc("/provider/add", handlers.AddProvider).Methods("POST")
 	provider.HandleFunc("/getbyemail", handlers.GetProviderByEmail).Methods("GET")
@@ -74,6 +75,9 @@ func main() {
 	provider.HandleFunc("/addservices", handlers.AddServiceToProvider).Methods("PUT")
 	provider.HandleFunc("/getservicesforprovider", handlers.GetServicesOfProvider).Methods("GET")
 	provider.HandleFunc("/deleteservice", handlers.RemoveServiceFromProvider).Methods("DELETE")
+	admin.HandleFunc("/deleteservice", handlers.RemoveServiceFromProvider).Methods("DELETE")
+	admin.HandleFunc("/getmanagerbycompany", handlers.GetManagersByCompanyId).Methods("GET")
+	admin.HandleFunc("/getappointments", handlers.GetProviderAppointments).Methods("GET")
 
 	// CORS Ayarları
 	corsRouter := middlewares.EnableCORS(r)

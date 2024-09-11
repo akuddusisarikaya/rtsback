@@ -202,6 +202,7 @@ func AddProviderApp(w http.ResponseWriter, r *http.Request) {
 	// Temporary struct for decoding JSON
 	var appointmentData struct {
 		ProviderEmail string `json:"providerEmail"`
+		CompanyID     string `json:"companyID"`
 		CompanyName   string `json:"companyName"`
 		Date          string `json:"date"`      // Tarih string olarak alınıyor
 		StartTime     string `json:"startTime"` // Başlangıç saati string olarak alınıyor
@@ -239,6 +240,7 @@ func AddProviderApp(w http.ResponseWriter, r *http.Request) {
 	appointment := models.Appointment{
 		ID:            primitive.NewObjectID(),
 		ProviderEmail: appointmentData.ProviderEmail,
+		CompanyID:	   appointmentData.CompanyID,
 		CompanyName:   appointmentData.CompanyName,
 		Date:          parsedDate,
 		StartTime:     parsedStartTime,
