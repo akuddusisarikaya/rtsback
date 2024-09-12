@@ -481,3 +481,66 @@ func UpdateAppointmentFieldsByID(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Appointment fields updated successfully"})
 }
+
+func UpdateAppointment(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// URL'den Appointment ID'yi al
+	appointmentID := r.URL.Query().Get("appointmentID")
+	if appointmentID == "" {
+		http.Error(w, "Appointment ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Appointment ID'yi ObjectID'ye çevir
+	objID, err := primitive.ObjectIDFromHex(appointmentID)
+	if err != nil {
+		http.Error(w, "Invalid Appointment ID", http.StatusBadRequest)
+		return
+	}
+
+	// Güncellenecek verileri almak için yapı
+	type UpdateRequest struct {
+		CustomerName  string   `json:"customer_name"`
+		CustomerEmail string   `json:"customer_email"`
+		Services      []string `json:"services"`
+	}
+
+	var updateReq UpdateRequest
+	err = json.NewDecoder(r.Body).Decode(&updateReq)
+	if err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// MongoDB güncelleme işlemi
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Güncelleme verisi
+	update := bson.M{
+		"$set": bson.M{
+			"customer_name":  updateReq.CustomerName,
+			"customer_email": updateReq.CustomerEmail,
+			"services":       updateReq.Services,
+			"activate":       true,
+			"updated_at":     time.Now(),
+		},
+	}
+
+	// Veritabanındaki randevuyu güncelle
+	result, err := appointmentCollection.UpdateOne(ctx, bson.M{"_id": objID}, update)
+	if err != nil {
+		http.Error(w, "Failed to update appointment", http.StatusInternalServerError)
+		return
+	}
+
+	// Eğer randevu bulunamadıysa
+	if result.MatchedCount == 0 {
+		http.Error(w, "Appointment not found", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Appointment updated successfully"})
+}

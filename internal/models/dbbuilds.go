@@ -8,7 +8,7 @@ import (
     "go.mongodb.org/mongo-driver/mongo"
 )
 
-var collections = []string{"admin", "appointment", "auth", "company", "manager", "provider", "user", "services"}
+var collections = []string{"admin", "appointment", "auth", "company", "manager", "provider", "user", "services", "verification"}
 
 func EnsureCollections(db *mongo.Client) {
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
