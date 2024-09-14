@@ -7,8 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-
-	//"os"
+	"os"
 	"rtsback/config"
 	"rtsback/internal/models"
 	"time"
@@ -110,15 +109,15 @@ func VerifyCode(w http.ResponseWriter, r *http.Request) {
 
 // E-posta gönderimi fonksiyonu
 func sendVerificationEmail(email, code string) error {
-	//MailPassword := os.Getenv("MAIL_PASSWORD")
+	MailPassword := os.Getenv("MAIL_PASSWORD")
 	m := gomail.NewMessage()
-	m.SetHeader("From", "sahmedkuddusi@gmial.com")                           
-	m.SetHeader("To", email)                                                    
-	m.SetHeader("Subject", "Email Verification Code")                          
-	m.SetBody("text/plain", fmt.Sprintf("Your verification code is: %s", code)) 
+	m.SetHeader("From", "sahmedkuddusi@gmial.com")
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Email Verification Code")
+	m.SetBody("text/plain", fmt.Sprintf("Your verification code is: %s", code))
 
 	// SMTP sunucu ayarları
-	d := gomail.NewDialer("smtp.gmail.com", 587, "sahmedkuddusi@gmail.com", "Aks29aks-")
+	d := gomail.NewDialer("smtp.gmail.com", 587, "sahmedkuddusi@gmail.com", MailPassword)
 
 	// E-posta gönderme işlemi
 	if err := d.DialAndSend(m); err != nil {
