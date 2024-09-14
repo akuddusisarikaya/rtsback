@@ -110,22 +110,19 @@ func VerifyCode(w http.ResponseWriter, r *http.Request) {
 
 // E-posta gönderimi fonksiyonu
 func sendVerificationEmail(email, code string) error {
-	//zohoMailPassword := os.Getenv("ZOHO_MAIL_PASSWORD")
+	//MailPassword := os.Getenv("MAIL_PASSWORD")
 	m := gomail.NewMessage()
-	m.SetHeader("From", "verification@carmesoft.com")                           // Gönderen e-posta adresi
-	m.SetHeader("To", email)                                                    // Alıcı e-posta adresi
-	m.SetHeader("Subject", "Email Verification Code")                           // E-posta konusu
-	m.SetBody("text/plain", fmt.Sprintf("Your verification code is: %s", code)) // E-posta içeriği
+	m.SetHeader("From", "sahmedkuddusi@gmial.com")                           
+	m.SetHeader("To", email)                                                    
+	m.SetHeader("Subject", "Email Verification Code")                          
+	m.SetBody("text/plain", fmt.Sprintf("Your verification code is: %s", code)) 
 
 	// SMTP sunucu ayarları
-	d := gomail.NewDialer("smtp.zoho.com", 587, "verification@carmesoft.com", "Verification-020624")
-
-	// TLS bağlantısını zorunlu kılmak için ayar
-	d.TLSConfig = nil // TLS bağlantısını kullanmasını sağla
+	d := gomail.NewDialer("smtp.gmail.com", 587, "sahmedkuddusi@gmail.com", "Aks29aks-")
 
 	// E-posta gönderme işlemi
-	err := d.DialAndSend(m)
-	if err != nil {
+	if err := d.DialAndSend(m); err != nil {
+		fmt.Printf("Error sending email: %v\n", err)
 		return err
 	}
 	return nil

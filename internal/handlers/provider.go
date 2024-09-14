@@ -456,3 +456,45 @@ func RemoveServiceFromProvider(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Service removed successfully"})
 }
+
+func GetProviderEmailsByCompanyID(w http.ResponseWriter, r *http.Request) {
+	companyID := r.URL.Query().Get("companyID")
+	if companyID == "" {
+		http.Error(w, "CompanyID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Sadece email alanını almak için projection kullan
+	projection := bson.D{{Key: "email", Value: 1}}
+
+	// Filter oluştur
+	filter := bson.M{"company_id": companyID}
+
+	cursor, err := providerCollection.Find(context.TODO(), filter, options.Find().SetProjection(projection))
+	if err != nil {
+		http.Error(w, "Failed to fetch providers", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	var emails []string
+	for cursor.Next(context.TODO()) {
+		var provider struct {
+			Email string `bson:"email"`
+		}
+		if err := cursor.Decode(&provider); err != nil {
+			http.Error(w, "Error decoding provider data", http.StatusInternalServerError)
+			return
+		}
+		emails = append(emails, provider.Email)
+	}
+
+	if err := cursor.Err(); err != nil {
+		http.Error(w, "Cursor error", http.StatusInternalServerError)
+		return
+	}
+
+	// Sonuçları JSON olarak döndür
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(emails)
+}

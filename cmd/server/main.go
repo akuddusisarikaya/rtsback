@@ -58,6 +58,7 @@ func main() {
 	admin.HandleFunc("/deleteservice", handlers.RemoveServiceFromProvider).Methods("DELETE")
 	admin.HandleFunc("/getmanagerbycompany", handlers.GetManagersByCompanyId).Methods("GET")
 	admin.HandleFunc("/getappointments", handlers.GetProviderAppointments).Methods("GET")
+	admin.HandleFunc("/getprovidersemails", handlers.GetProviderEmailsByCompanyID).Methods("GET")
 
 	// Korumalı Rotlar Provider
 	provider.HandleFunc("/providers", handlers.GetProviders).Methods("GET")
