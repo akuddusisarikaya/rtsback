@@ -1,0 +1,1 @@
+RTS Projesi bir Randevu takip Projesi olarak yazılmış olup rtsBack GO Lang dili kullanarak yazdığım bir backend projesidir. Mongo DB veri tabanını kendi lokal veri tabanım üzerinden kullanarak geliştirmiş olup istenirse global veri tabanı kullanılabilir. Front-end için React.JS kütüphanesi kullandım onun için de diğer repolarıma göz atabilirsiniz. 
